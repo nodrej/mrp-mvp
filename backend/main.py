@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import models
 import schemas
-from database import get_db, init_db, engine
+from database import get_mst_now, get_db, init_db, engine, MST_TIMEZONE
 from mrp import MRPEngine
 
 # Create FastAPI app
@@ -460,9 +460,10 @@ def adjust_inventory(adjustment: schemas.InventoryAdjustmentCreate, db: Session 
     else:
         enhanced_notes = f"Previous: {previous_on_hand}, New: {new_on_hand}"
 
-    # Record adjustment with enhanced notes
+    # Record adjustment with enhanced notes using MST time
     db_adjustment = models.InventoryAdjustment(
         product_id=adjustment.product_id,
+        adjustment_date=get_mst_now(),
         quantity_change=adjustment.quantity_change,
         reason=adjustment.reason,
         notes=enhanced_notes
@@ -811,7 +812,7 @@ def get_material_analysis_history(days: int = 30, db: Session = Depends(get_db))
         adjustments = db.query(models.InventoryAdjustment).filter(
             models.InventoryAdjustment.product_id == component.id,
             models.InventoryAdjustment.adjustment_date >= start_date,
-            models.InventoryAdjustment.adjustment_date <= datetime.now()
+            models.InventoryAdjustment.adjustment_date <= get_mst_now()
         ).order_by(models.InventoryAdjustment.adjustment_date.asc()).all()
 
         # Get current inventory
@@ -1024,9 +1025,10 @@ def save_sales_history(sales_data: schemas.SalesHistoryBulkCreate, db: Session =
             # Deduct finished good (negative delta = increase inventory back)
             finished_good_inventory.on_hand = finished_good_inventory.on_hand - Decimal(str(total_delta))
 
-            # Create adjustment record for finished good
+            # Create adjustment record for finished good using MST time
             fg_adjustment = models.InventoryAdjustment(
                 product_id=sales_data.product_id,
+                adjustment_date=get_mst_now(),
                 quantity_change=-total_delta,  # Negative because it's shipped out
                 reason=f"Production Output",
                 notes=f"Shipped {total_delta} units. Previous: {previous_fg_qty}, New: {float(finished_good_inventory.on_hand)}"
@@ -1056,9 +1058,10 @@ def save_sales_history(sales_data: schemas.SalesHistoryBulkCreate, db: Session =
                 previous_comp_qty = float(component_inventory.on_hand)
                 component_inventory.on_hand = component_inventory.on_hand - Decimal(str(component_total_qty))
 
-                # Create adjustment record for component
+                # Create adjustment record for component using MST time
                 comp_adjustment = models.InventoryAdjustment(
                     product_id=bom_line.component_product_id,
+                    adjustment_date=get_mst_now(),
                     quantity_change=-component_total_qty,
                     reason=f"Production Consumption - Used in {product.code}",
                     notes=f"Consumed for {total_delta} units of {product.code}. Previous: {previous_comp_qty}, New: {float(component_inventory.on_hand)}"
@@ -1658,6 +1661,7 @@ def receive_purchase_order(
 
     adjustment = models.InventoryAdjustment(
         product_id=db_po.product_id,
+        adjustment_date=get_mst_now(),
         quantity_change=receive_data.received_quantity,
         reason=f"PO Receipt: {db_po.po_number}",
         notes=enhanced_notes
@@ -1708,9 +1712,10 @@ def undo_purchase_order_receipt(po_id: int, db: Session = Depends(get_db)):
 
     inventory.on_hand = new_on_hand
 
-    # Create inventory adjustment record for the reversal
+    # Create inventory adjustment record for the reversal using MST time
     adjustment = models.InventoryAdjustment(
         product_id=db_po.product_id,
+        adjustment_date=get_mst_now(),
         quantity_change=-received_qty,
         reason=f"PO Receipt Undo: {db_po.po_number}",
         notes=f"Reversed PO receipt. Previous: {previous_on_hand}, New: {new_on_hand}"

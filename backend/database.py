@@ -2,6 +2,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
+from datetime import datetime
+import pytz
+
+# Configure MST timezone
+MST_TIMEZONE = pytz.timezone('America/Denver')  # MST/MDT as appropriate
+
+def get_mst_now():
+    """Get current time in MST timezone"""
+    return datetime.now(MST_TIMEZONE)
 
 # SQLite database file location
 # Use environment variable if set (for Docker), otherwise use relative path

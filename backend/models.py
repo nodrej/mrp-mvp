@@ -91,7 +91,7 @@ class InventoryAdjustment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    adjustment_date = Column(DateTime(timezone=True), server_default=func.now())
+    adjustment_date = Column(DateTime(timezone=True), default=None, server_default=func.now())
     quantity_change = Column(Numeric(15, 2), nullable=False)
     reason = Column(String(200))
     notes = Column(Text)
